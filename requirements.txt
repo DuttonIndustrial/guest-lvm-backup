@@ -1,0 +1,22 @@
+LVMsync syncronizes lvm snapshots from a local drive to a remote site.
+
+
+if device does not exist on destination then fail.
+
+if snapshot source and snapshot dest aren't the same size then fail.
+
+
+
+for each block in source-snapshot
+	checksum block 
+	checksum same block in dest
+	if checksums differ, copy the block, if the block is all zeros, don't copy it
+	
+	
+compute running checksum on the entire process as you progress on both sides
+if the checksum is the same on both sides we are done
+	
+
+
+
+It checksums blocks to copy only data that is different between the remote and local drive.
