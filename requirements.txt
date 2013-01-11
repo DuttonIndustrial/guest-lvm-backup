@@ -1,22 +1,39 @@
-LVMsync syncronizes lvm snapshots from a local drive to a remote site.
+LVMsync syncronizes lvm snapshots from a local drive to a remote file.
+
+LVMsync uses rdiff to copy over only the minimum differences.
 
 
-if device does not exist on destination then fail.
-
-if snapshot source and snapshot dest aren't the same size then fail.
-
-
-
-for each block in source-snapshot
-	checksum block 
-	checksum same block in dest
-	if checksums differ, copy the block, if the block is all zeros, don't copy it
-	
-	
-compute running checksum on the entire process as you progress on both sides
-if the checksum is the same on both sides we are done
-	
+The dest file is gzipped to save space.
 
 
 
-It checksums blocks to copy only data that is different between the remote and local drive.
+On the source file, a snapshot is generated.
+
+
+
+Then the source and backup file is broken up into N - X length chunks. 
+
+
+For each chunk, rdiff generates a signature on the dest file
+
+Then rdiff generates a delta on the source file
+
+Then rdiff applies the patch to the new dest file
+
+
+
+We implement this as a rolling through a buffer. 
+
+
+SOURCE - this is the source device
+
+SIGDEST - this is the previous backup file, it is stored zipped up. 
+
+BACKDEST- this is the new backup file, it is stored zipped up. That backup server stores 1 or more of these.
+
+To generate signatures, we iterate through each block in SIGDEST, compute signature on the block, zip the signature and send it to the source side
+
+The source program iterates through each block in SOURCE, it unzips the block signature, creates a delta, zips the delta and sends it back
+
+
+
