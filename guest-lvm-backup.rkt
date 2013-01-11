@@ -160,6 +160,9 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
   (log-guest-lvm-backup-info "starting guest ~a" guestname)
   (start-guest guestname)
   
+  (define snapshot-size (logical-volume-size snapshot-logical-path))
+  (log-guest-lvm-backup-info "snapshot size is ~a bytes" snapshot-size)
+  
   
   ;start remote basis process
   (define-values (basis-i to-basis) (make-pipe (* 1024 1024)))

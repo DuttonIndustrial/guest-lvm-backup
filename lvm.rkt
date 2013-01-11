@@ -1,14 +1,15 @@
 #lang racket/base
 
 
-(require racket/system
-         racket/port)
+(require racket/list
+         racket/port
+         racket/system)
 
 
 (provide logical-volume-exists?
          snapshot-logical-volume
          remove-logical-volume
-         merge-snapshot)
+         logical-volume-size)
 
 ;todo - pipe output to a pipe and only display it if there is an error
 
@@ -18,17 +19,24 @@
 
 
 (define (snapshot-logical-volume path snapshot-name size #:rw? (rw? #t))
-    (unless (system (format "lvcreate --snapshot --size ~a  --permission ~a --name ~a ~a" size (if rw? "rw" "r") snapshot-name path))
-      (error 'snapshot-logical-volume "failed to create snapshot ~v of logical volume ~v" snapshot-name path))
-    (void))
+  (define output (open-output-string))
+  (unless (parameterize ([current-output-port output]
+                         [current-error-port output])
+            (system (format "lvcreate --snapshot --size ~a  --permission ~a --name ~a ~a" size (if rw? "rw" "r") snapshot-name path)))
+    (error 'snapshot-logical-volume "failed to create snapshot ~v of logical volume ~v. error ~v" snapshot-name path (get-output-string output)))
+  (void))
 
 (define (remove-logical-volume path)
-    (unless (system (format "lvremove -f ~a" path))
-      (error 'snapshot-logical-volume "failed to remove logical volume ~v" path))
-    (void))
-  
+  (define output (open-output-string))
+  (unless (parameterize ([current-output-port output]
+                         [current-error-port output])
+            (system (format "lvremove -f ~a" path)))
+    (error 'snapshot-logical-volume "failed to remove logical volume ~v. error ~v" path (get-output-string output)))
+  (void))
 
-(define (merge-snapshot path)
-    (unless (system (format "lvconvert --merge ~a" path))
-      (error 'mege-snapshot "failed to merge snapshot ~v" path))
-    (void))
+(define (logical-volume-size path)
+  (define output (open-output-string))
+  (unless (parameterize ([current-output-port output])
+            (system (format "lvs --noheading --units b --nosuffix -o lv_size  ~a" path)))
+    (error 'logical-volume-size "command lvs failed. error ~a" (get-output-string output)))
+  (string->number (first (regexp-match #rx"[0-9]+" (get-output-string output)))))
