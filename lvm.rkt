@@ -15,7 +15,11 @@
 
 
 (define (logical-volume-exists? path)
-    (system (format "lvdisplay ~a" path)))
+  (define output (open-output-string))
+  (unless (parameterize ([current-output-port output]
+                         [current-error-port output])
+            (system (format "lvdisplay ~a" path)))
+    (error 'logical-volume-exists? "failed to determine if volume ~a exists. error:" (get-output-string output))))
 
 
 (define (snapshot-logical-volume path snapshot-name size #:rw? (rw? #t))
@@ -23,7 +27,7 @@
   (unless (parameterize ([current-output-port output]
                          [current-error-port output])
             (system (format "lvcreate --snapshot --size ~a  --permission ~a --name ~a ~a" size (if rw? "rw" "r") snapshot-name path)))
-    (error 'snapshot-logical-volume "failed to create snapshot ~v of logical volume ~v. error ~v" snapshot-name path (get-output-string output)))
+    (error 'snapshot-logical-volume "failed to create snapshot ~v of logical volume ~a. error ~a" snapshot-name path (get-output-string output)))
   (void))
 
 (define (remove-logical-volume path)
@@ -31,7 +35,7 @@
   (unless (parameterize ([current-output-port output]
                          [current-error-port output])
             (system (format "lvremove -f ~a" path)))
-    (error 'snapshot-logical-volume "failed to remove logical volume ~v. error ~v" path (get-output-string output)))
+    (error 'snapshot-logical-volume "failed to remove logical volume ~a. error ~a" path (get-output-string output)))
   (void))
 
 (define (logical-volume-size path)
