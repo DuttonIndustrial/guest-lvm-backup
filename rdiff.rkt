@@ -58,18 +58,7 @@
         (begin
           (write (list 'completed block-end-position) signature-o)
           (flush-output signature-o)
-          (log-rdiff-sig-proc-info "~a: completed computed signature for ~a bytes." (now) block-end-position)
-          (log-rdiff-sig-proc-info "~a: read ~a bytes at (~a MB/s). wrote ~a bytes at (~a MB/s) in ~a" 
-                                   (now) 
-                                   block-end-position
-                                   (/ block-end-position 
-                                      (- block-end-time signature-start-time)
-                                      1048.576)
-                                   (file-position (current-output-port))
-                                   (/ (file-position (current-output-port))
-                                      (- block-end-time signature-start-time)
-                                      1048.576)
-                                   (milliseconds->string (- block-end-time signature-start-time))))
+          (log-rdiff-sig-proc-info "~a: completed computed signature for ~a bytes." (now) block-end-position))
         (begin
           (write (list 'signature block-start-position block-end-position (bytes-length sig-bytes)) signature-o)
           (write-bytes sig-bytes signature-o)
@@ -81,16 +70,6 @@
                                    block-end-position 
                                    (bytes-length sig-bytes) 
                                    (milliseconds->string (- block-end-time block-start-time)))
-          #|(log-rdiff-sig-proc-info "~a: reading at ~a MB/s. writing at ~a MB/s" 
-                                   (now) 
-                                   (~r (/ block-end-position 
-                                          (- block-end-time signature-start-time)
-                                          1048.576)
-                                       #:precision 2)
-                                   (~r (/ (file-position (current-output-port))
-                                          (- block-end-time signature-start-time)
-                                          1048.576)
-                                       #:precision 2)|#
           (loop (add1 block-count))))))
   
   
