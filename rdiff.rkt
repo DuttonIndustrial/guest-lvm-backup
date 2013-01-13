@@ -45,7 +45,7 @@
     (define basis-block-i (make-limited-input-port basis-file-i block-size #f))
     (define block-start-time (current-inexact-milliseconds))
     
-    (log-rdiff-sig-proc-info "~a: processing block ~a" (now) block-count)
+    (log-rdiff-sig-proc-debug "~a: processing block ~a" (now) block-count)
     
     (define sig-bytes  (with-output-to-bytes 
                             (λ ()
@@ -63,7 +63,7 @@
           (write (list 'signature block-start-position block-end-position (bytes-length sig-bytes)) signature-o)
           (write-bytes sig-bytes signature-o)
           (flush-output signature-o)
-          (log-rdiff-sig-proc-info "~a: block ~a [~a - ~a] signature ~a in ~a" 
+          (log-rdiff-sig-proc-debug "~a: block ~a [~a - ~a] signature ~a in ~a" 
                                    (now) 
                                    block-count 
                                    block-start-position 
@@ -92,7 +92,7 @@
          
          [(list 'signature block-start block-end signature-length)
           (define block-size (- block-end block-start))
-          (log-rdiff-delta-proc-info "~a: received signature for block [~a - ~a] with signature size ~a" (now) block-start block-end signature-length)
+          (log-rdiff-delta-proc-debug "~a: received signature for block [~a - ~a] with signature size ~a" (now) block-start block-end signature-length)
           
           ;write the block data to a file
           (with-output-to-file block-signature-file
@@ -109,7 +109,7 @@
           ;rdiff delta signature-i src-i delta-o
           (write (list 'delta block-start block-end (bytes-length delta-bytes)) delta-o)
           (write-bytes delta-bytes delta-o)
-          (log-rdiff-delta-proc-info "~a: wrote delta block [~a - ~a] ~a" (now) block-start block-end (bytes-length delta-bytes))
+          (log-rdiff-delta-proc-debug "~a: wrote delta block [~a - ~a] ~a" (now) block-start block-end (bytes-length delta-bytes))
           (flush-output delta-o)
           (loop)]))
      (begin
@@ -130,7 +130,7 @@
      (match (read delta-i)
        [(list 'delta block-start block-end delta-length)
         (define block-size (- block-end block-start))
-        (log-rdiff-patch-proc-info "processing block ~a - ~a delta-length ~a" block-start block-end delta-length)
+        (log-rdiff-patch-proc-debug "processing block ~a - ~a delta-length ~a" block-start block-end delta-length)
         
         ;write the delta block data to a file
         (with-output-to-file block-delta-file
