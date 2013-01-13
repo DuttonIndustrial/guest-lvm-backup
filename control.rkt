@@ -3,12 +3,14 @@
 
 (require racket/async-channel
          racket/function
-         racket/list)
+         racket/list
+         racket/port)
 
 
 (provide finally
          watch
-         pipeline)
+         pipeline
+         tee)
 
 (require (for-syntax racket/base
                      syntax/parse))
@@ -22,6 +24,7 @@
                                    body)
                                  (λ ()
                                    finalizer))]))
+
 
 
 (define (watch . thunks)
@@ -90,3 +93,14 @@
                                         (close-output-port o)))))
                          (loop (rest thunks)
                                next-i))))))))
+
+(define (tee thunk)
+  (define-values (i o) (make-pipe (* 64 1024)))
+  (watch
+   (begin
+     (copy-port (current-input-port) (current-output-port) o)
+     (close-output-port o))
+   (parameterize ([current-input-port i]
+                  [current-output-port (open-output-nowhere)])
+     (thunk))))
+           
