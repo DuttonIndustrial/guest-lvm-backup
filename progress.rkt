@@ -1,11 +1,25 @@
 #lang racket/base
 
-(require racket/format
+(require racket/contract/base
+         racket/format
          racket/list
          racket/math)
 
-(provide print-progress
-         copy-port-progress)
+(provide (contract-out [print-progress
+                        (->* ((real-in 0 1))
+                             (#:barlength exact-positive-integer?
+                              #:linewidth exact-positive-integer?
+                              #:output output-port?) 
+                             #:rest (listof any/c)
+                             any/c)]
+                       [copy-port-progress
+                        (->* ((-> positive? exact-positive-integer? any/c) input-port?)
+                             (#:chunk-size exact-positive-integer?
+                              #:report-interval positive?)
+                             #:rest (non-empty-listof output-port?)
+                             any/c)]
+                       [make-progress-reporter
+                        (-> output-port? exact-positive-integer? (-> positive? exact-positive-integer? any/c))]))
 
 (define (print-progress percent 
                         #:barlength (barlength 20)
@@ -16,16 +30,14 @@
            "\r~a" 
           (~a "[" 
               (~a (~a "." 
-                      #:width (exact-round (* percent barlength))
+                      #:width (round (* percent barlength))
                       #:left-pad-string "." 
                       #:align 'right)
                   #:width barlength
                   #:right-pad-string " "
                   #:align 'left)
               "] "
-              (~r (* percent 100)
-                  #:min-width 4
-                  #:precision 1)
+              (round (* percent 100))
               "% "
               (if (empty? args) "" (apply format args))
               #:width linewidth
@@ -42,40 +54,48 @@
 
 
 ;copies data from current-input-port to current-output-port
-;reports the progress to progress-output-port every progress-time-interval
-
-(define (copy-port-progress progress-output-port progress-time total buffer-size)
+;copy-port calls progress with the number of bytes written after each round of writing
+(define (copy-port-progress progress 
+                            #:chunk-size (chunk-size (* 64 1024))
+                            #:report-interval (report-interval 1)
+                            in 
+                            . outs)
   
+  (define bytes (make-bytes chunk-size))
   (define start-time (current-inexact-milliseconds))
   
-  (let loop ([next-progress 0]
-             [count 0])
-    (if (> (current-inexact-milliseconds) next-progress)
-        (begin
-          (print-progress (/ count total)
-                              #:output progress-output-port
-                              "~a of ~a bytes at ~a MB/s"
-                              count
-                              total
-                              (~r (mb/sec (- (current-inexact-milliseconds) start-time)
-                                      count)
-                                  #:precision 2))
-          (loop (+ (current-inexact-milliseconds) progress-time) count))
-        (let ([bytes (read-bytes buffer-size)])
-          (if (eof-object? bytes)
+  (let loop ([count 0]
+             [next-report 0])
+    (let ([amount (read-bytes! bytes in)])
+      (if (eof-object? amount)
+          (progress start-time count)
+          (begin
+            (for-each (λ (out)
+                        (write-bytes bytes out 0 amount))
+                      outs)
+            (if (> (current-inexact-milliseconds) next-report)
               (begin
-                (print-progress 1
-                                #:output progress-output-port
-                                "~a of ~a bytes at ~a MB/s"
-                                count
-                                total
-                                (~r (mb/sec (- (current-inexact-milliseconds) start-time)
-                                        count)
-                                    #:precision 2))
-                (fprintf progress-output-port "~n")
-                (close-output-port (current-output-port)))
-              (begin
-                (write-bytes bytes)
-                (loop next-progress (+ count (bytes-length bytes)))))))))
+                (progress start-time (+ count amount))
+                (loop (+ count amount) (+ (current-inexact-milliseconds) (* report-interval 1000))))
+              (loop (+ count amount) next-report)))))))
+            
+        
+        
+(define (make-progress-reporter progress-port total-count)
+  (λ (start-time count)
+    (print-progress (/ count total-count)
+                    #:output progress-port
+                    "~a of ~a bytes at ~a MB/s"
+                    count
+                    total-count
+                    (format-rational (mb/sec (- (current-inexact-milliseconds) start-time)
+                                             count) 2))
+    
+    (when (= total-count count)
+      (fprintf progress-port "~n"))))
+
+
+(define (format-rational num precision)
+  (/ (round (* num (expt 10 precision))) (expt 10 precision) 1.0))
   
-  
+ 
