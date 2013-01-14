@@ -13,12 +13,12 @@
                              #:rest (listof any/c)
                              any/c)]
                        [copy-port-progress
-                        (->* ((-> positive? exact-positive-integer? any/c) input-port?)
+                        (->* ((-> positive? exact-positive-integer? boolean? any/c) input-port?)
                              (#:report-interval positive?)
                              #:rest (non-empty-listof output-port?)
                              any/c)]
                        [make-progress-reporter
-                        (-> output-port? exact-positive-integer? (-> positive? exact-positive-integer? any/c))]))
+                        (-> output-port? exact-positive-integer? (-> positive? exact-positive-integer? boolean? any/c))]))
 
 (define (print-progress percent 
                         #:barlength (barlength 20)
@@ -66,21 +66,21 @@
              [next-report 0])
     (let ([amount (read-bytes-avail! bytes in)])
       (if (eof-object? amount)
-          (progress start-time count)
+          (progress start-time count #t)
           (begin
             (for-each (λ (out)
                         (write-bytes bytes out 0 amount))
                       outs)
             (if (> (current-inexact-milliseconds) next-report)
               (begin
-                (progress start-time (+ count amount))
+                (progress start-time (+ count amount) #f)
                 (loop (+ count amount) (+ (current-inexact-milliseconds) (* report-interval 1000))))
               (loop (+ count amount) next-report)))))))
             
         
         
 (define (make-progress-reporter progress-port total-count)
-  (λ (start-time count)
+  (λ (start-time count final)
     (print-progress (/ count total-count)
                     #:output progress-port
                     "~a of ~a bytes at ~a MB/s"
@@ -89,7 +89,7 @@
                     (format-rational (mb/sec (- (current-inexact-milliseconds) start-time)
                                              count) 2))
     
-    (when (= total-count count)
+    (when final
       (fprintf progress-port "~n"))))
 
 
