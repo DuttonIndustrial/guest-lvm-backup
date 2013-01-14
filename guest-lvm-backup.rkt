@@ -92,7 +92,7 @@
 
 ;find latest basis file
 ;start unzipping it and sending back the signature of the file
-(define (guest-lvm-backup-signature-proc basis-file)
+(define (guest-lvm-backup-signature-proc basis-file #:block-size (block-size (* 512 1024 1024) ))
   (define-logger guest-lvm-backup-signature)
   (log-guest-lvm-backup-signature-info "starting up")
   (pipeline (λ ()
@@ -101,7 +101,7 @@
                 (λ ()
                   (gunzip (current-input-port) (current-output-port)))))
             (λ ()
-              (rdiff-sig-proc (current-input-port) (current-output-port) #:block-size (* 512 1024 1024)))))
+              (rdiff-sig-proc (current-input-port) (current-output-port) #:block-size block-size))))
           
 
 
@@ -120,13 +120,13 @@
   (finally
    (begin
      
-     (define snapshot-size (match (read)
-                             [(list 'snapshot-size snapshot-size)
-                              snapshot-size]
+     (define volume-size (match (read)
+                             [(list 'volume-size volume-size)
+                              volume-size]
                              [else
                               (error 'message-not-understood "failed to understand message ~v" else)]))
      
-     (log-guest-lvm-backup-patch-info "received snapshot size of ~a" snapshot-size)
+     (log-guest-lvm-backup-patch-info "received volume size of ~a" volume-size)
      
      (define backup-sha1sum-channel (make-async-channel))
      
@@ -153,7 +153,7 @@
                                 (log-guest-lvm-backup-patch-info "backup sha1sum is ~v" backup-sha1sum)
                                 (async-channel-put backup-sha1sum-channel backup-sha1sum)))))
                      (λ ()
-                       (copy-port-progress (make-progress-reporter stdout snapshot-size) (current-input-port) (current-output-port)))
+                       (copy-port-progress (make-progress-reporter stdout volume-size) (current-input-port) (current-output-port)))
                      (λ ()
                        (gzip (current-input-port) (current-output-port)))))))))
      
@@ -187,7 +187,7 @@ copies up the difference to remote host with remote user using the remotebasis_n
 
 remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
 |#
-(define (guest-lvm-backup guestname lvmdiskpath remoteuser remotehost #:snapshot-size (snapshot-size 10) #:identity (identity #f) #:port (port #f))
+(define (guest-lvm-backup guestname lvmdiskpath remoteuser remotehost #:volume-size (volume-size 10) #:identity (identity #f) #:port (port #f))
   (define-logger guest-lvm-backup)
   
   (define std-out (current-output-port))
@@ -214,35 +214,42 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
              (printf "~a: starting guest ~a~n" (now) guestname)
              (start-guest guestname)))
   
-  (define snapshot-size (logical-volume-size snapshot-logical-path))
-  (log-guest-lvm-backup-info "~a: snapshot size is ~a bytes" (now) snapshot-size)
+  (define volume-size (logical-volume-size lvmdiskpath))
+  (log-guest-lvm-backup-info "~a: volume size is ~a bytes" (now) volume-size)
   
   (finally 
      (pipeline (λ ()
                  (ssh-command remoteuser 
                               remotehost 
-                              (format "racket -W info guest-lvm-backup/guest-lvm-backup.rkt locate ~a ~a" (gethostname) guestname)
+                              (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a locate ~a ~a" 
+                                      (if (log-level) 
+                                          (format "--log-level ~a" (log-level))
+                                          "")
+                                      (gethostname) 
+                                      guestname)
                               #:port port
                               #:identity identity)
                  (log-guest-lvm-backup-info "~a: locate process completed" (now)))
                (λ ()
                  (match (read)
                    [(list 'no-basis-file)     
+                    (printf "~a: performing full backup~n" (now))
                     (pipeline (λ ()
                                 (with-input-from-file snapshot-logical-path
                                   #:mode 'binary
                                   (λ ()
-                                    (copy-port-progress (make-progress-reporter std-out snapshot-size) (current-input-port) (current-output-port)))))
+                                    (copy-port-progress (make-progress-reporter std-out volume-size) (current-input-port) (current-output-port)))))
                               
                               (λ ()
                                 (gzip (current-input-port) (current-output-port)))
                               
                               (λ ()
+                                (define bytes (make-bytes (* 64 1024)))
                                 (let loop ()
-                                  (let ([bytes (read-bytes (* 1024 1024))])
-                                    (unless (eof-object? bytes)
-                                      (write (list 'bytes (bytes-length bytes)))
-                                      (write-bytes bytes)
+                                  (let ([count (read-bytes-avail! bytes)])
+                                    (unless (eof-object? count)
+                                      (write (list 'bytes count))
+                                      (write-bytes bytes (current-output-port) 0 count)
                                       (loop))))
                                 
                                 (write (list 'done)))
@@ -250,20 +257,33 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                               (λ ()
                                 (ssh-command remoteuser 
                                              remotehost 
-                                             (format "racket -W info guest-lvm-backup/guest-lvm-backup.rkt full-backup ~a ~a ~a" (gethostname) guestname snapshot-time)
+                                             (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a full-backup ~a ~a ~a" 
+                                                     (if (log-level) 
+                                                         (format "--log-level ~a" (log-level))
+                                                         "")
+                                                     (gethostname) 
+                                                     guestname 
+                                                     snapshot-time)
                                              #:port port
                                              #:identity identity)))
                     
-                    (log-guest-lvm-backup-info "~a: completed full transfer of basis" (now))]
+                    (printf "~a: completed full backup~n" (now))]
+                    
                    
                    [(list 'basis-file basis-file)
+                    
+                    (printf "~a: performing differential backup~n" (now))
                     
                     (define snapshot-sha1sum-channel (make-async-channel))
                     
                     (pipeline (λ ()
                                 (ssh-command remoteuser 
                                              remotehost 
-                                             (format "racket -W info guest-lvm-backup/guest-lvm-backup.rkt signature ~a " basis-file)
+                                             (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a signature ~a "
+                                                     (if (log-level) 
+                                                         (format "--log-level ~a" (log-level))
+                                                         "")
+                                                     basis-file)
                                              #:port port
                                              #:identity identity))
                               (λ ()
@@ -278,18 +298,25 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                                                          (log-guest-lvm-backup-info "sha1sum of snapshot is ~v" sha1sum)
                                                          (async-channel-put snapshot-sha1sum-channel sha1sum)))))
                                               (λ ()
-                                                (write (list 'snapshot-size snapshot-size))
+                                                (write (list 'volume-size volume-size))
                                                 (rdiff-delta-proc signature-in (current-output-port) (current-input-port))
                                                 (write (list 'snapshot-sha1sum (async-channel-get snapshot-sha1sum-channel))))))))
                               
                               (λ ()
                                 (ssh-command remoteuser 
                                              remotehost 
-                                             (format "racket -W info guest-lvm-backup/guest-lvm-backup.rkt patch ~a ~a ~a ~a" basis-file (gethostname) guestname snapshot-time)
+                                             (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a patch ~a ~a ~a ~a"
+                                                     (if (log-level) 
+                                                         (format "--log-level ~a" (log-level))
+                                                         "")
+                                                     basis-file 
+                                                     (gethostname) 
+                                                     guestname 
+                                                     snapshot-time)
                                              #:port port
                                              #:identity identity)))
                     
-                    
+                    (printf "~a: completed differential backup~n" (now))
                     (log-guest-lvm-backup-info "completed backup!")]
                    
                    [else
@@ -301,6 +328,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
 
 (define ssh-port (make-parameter #f))
 (define ssh-identity (make-parameter #f))
+(define log-level (make-parameter #f))
 
 (command-line
  #:program "guest-lvm-backup"
@@ -308,10 +336,42 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
  [("-i" "--identity") identity 
                       "Use ssh identity file"
                       (ssh-identity identity)]
+ 
  [("-p" "--port") port
                   "Use ssh port"
                   (ssh-port port)]
+ 
+ [("--log-level") ll
+                 "racket log level to output to standard-error port"
+                 (log-level (match ll
+                              ["debug"
+                               'debug]
+                              ["info"
+                               'info]
+                              ["warning"
+                               'warning]
+                              ["error"
+                               'error]
+                              ["fatal"
+                               'fatal]
+                              [else
+                               (error 'log-level "log level must be one of (fatal error warning info debug)")]))]
+ 
+ 
+ 
  #:args args
+ (begin
+   ;setup logging
+   (define logging-thread (if (log-level)
+                            (thread (λ ()
+                                      (define lr (make-log-receiver (current-logger) (log-level) #f))
+                                      (let loop ()
+                                        (let ([msg (sync lr)])
+                                          (eprintf "~a~n" (vector-ref msg 1)))
+                                        (loop))))
+                            #f))
+ 
+   
  (match args
    [(list "locate" hostname guestname)
     (guest-lvm-backup-basis-locate-proc hostname guestname)]
@@ -320,7 +380,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
     (guest-lvm-backup-full-backup-proc hostname guestname snapshot-time)]
     
    [(list "signature" basis-file)
-    (guest-lvm-backup-signature-proc basis-file)]
+    (guest-lvm-backup-signature-proc basis-file #:block-size (* 512 1024 1024))]
    
    [(list "patch" basis-file hostname guestname snapshot-time)
     (guest-lvm-backup-patch-proc basis-file hostname guestname snapshot-time)]
@@ -329,7 +389,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
     (guest-lvm-backup guestname lvmdiskpath remoteuser remotehost #:port (ssh-port) #:identity (ssh-identity))]
    
    [else
-    (error 'bad-arguments "commandline not recognized ~a" else)]))
+    (error 'bad-arguments "commandline not recognized ~a" else)])))
   
   
   
