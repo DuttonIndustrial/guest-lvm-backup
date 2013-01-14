@@ -14,8 +14,7 @@
                              any/c)]
                        [copy-port-progress
                         (->* ((-> positive? exact-positive-integer? any/c) input-port?)
-                             (#:chunk-size exact-positive-integer?
-                              #:report-interval positive?)
+                             (#:report-interval positive?)
                              #:rest (non-empty-listof output-port?)
                              any/c)]
                        [make-progress-reporter
@@ -56,17 +55,16 @@
 ;copies data from current-input-port to current-output-port
 ;copy-port calls progress with the number of bytes written after each round of writing
 (define (copy-port-progress progress 
-                            #:chunk-size (chunk-size (* 64 1024))
                             #:report-interval (report-interval 1)
                             in 
                             . outs)
   
-  (define bytes (make-bytes chunk-size))
+  (define bytes (make-bytes 4096))
   (define start-time (current-inexact-milliseconds))
   
   (let loop ([count 0]
              [next-report 0])
-    (let ([amount (read-bytes! bytes in)])
+    (let ([amount (read-bytes-avail! bytes in)])
       (if (eof-object? amount)
           (progress start-time count)
           (begin
