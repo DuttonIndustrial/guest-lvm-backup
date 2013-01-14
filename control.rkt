@@ -97,10 +97,31 @@
 (define (tee thunk)
   (define-values (i o) (make-pipe (* 64 1024)))
   (watch
-   (begin
+   (λ ()
      (copy-port (current-input-port) (current-output-port) o)
      (close-output-port o))
-   (parameterize ([current-input-port i]
-                  [current-output-port (open-output-nowhere)])
-     (thunk))))
+   (λ ()
+     (parameterize ([current-input-port i]
+                    [current-output-port (open-output-nowhere)])
+       (thunk)))))
+
+
+
+#|
+(define (tee-test)
+  (define i (open-input-string "hello"))
+  (define o (open-output-string))
+  (define tee-data #f)
+  
+  (parameterize ([current-input-port i]
+                 [current-output-port o])
+    (tee (λ ()
+           (set! tee-data (read))
+           (log-debug "tee-done"))))
+  
+  (printf "tee-data ~a~n" tee-data)
+  (printf "o-data ~a~n" (get-output-string o)))
+|#
+  
+  
            
