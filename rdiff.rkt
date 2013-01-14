@@ -39,38 +39,51 @@
   (define signature-start-time (current-inexact-milliseconds))
   (log-rdiff-sig-proc-debug "~a: computing signature with block size ~a bytes" (now) block-size)
   
-  (let loop ([block-count 0])
-    
-    (define block-start-position (file-position basis-file-i))
-    (define basis-block-i (make-limited-input-port basis-file-i block-size #f))
-    (define block-start-time (current-inexact-milliseconds))
-    
-    (log-rdiff-sig-proc-debug "~a: processing block ~a" (now) block-count)
-    
-    (define sig-bytes  (with-output-to-bytes 
-                            (λ ()
-                              (rdiff-signature basis-block-i (current-output-port)))))
-
-    (define block-end-position (file-position basis-file-i))
-    (define block-end-time (current-inexact-milliseconds))
-    
-    (if (= block-start-position block-end-position)
-        (begin
-          (write (list 'completed block-end-position) signature-o)
-          (flush-output signature-o)
-          (log-rdiff-sig-proc-debug "~a: completed computed signature for ~a bytes." (now) block-end-position))
-        (begin
-          (write (list 'signature block-start-position block-end-position (bytes-length sig-bytes)) signature-o)
-          (write-bytes sig-bytes signature-o)
-          (flush-output signature-o)
-          (log-rdiff-sig-proc-debug "~a: block ~a [~a - ~a] signature ~a in ~a" 
-                                   (now) 
-                                   block-count 
-                                   block-start-position 
-                                   block-end-position 
-                                   (bytes-length sig-bytes) 
-                                   (milliseconds->string (- block-end-time block-start-time)))
-          (loop (add1 block-count))))))
+  (define block-signature-file (make-temporary-file "block-signature~a.bin"))
+  (log-rdiff-sig-proc-debug "~a: created block signature file" (now) block-signature-file)
+  
+  (finally
+   (let loop ([block-count 0])
+     
+     (define block-start-position (file-position basis-file-i))
+     (define basis-block-i (make-limited-input-port basis-file-i block-size #f))
+     (define block-start-time (current-inexact-milliseconds))
+     
+     (log-rdiff-sig-proc-debug "~a: processing block ~a" (now) block-count)
+     
+     (define signature-size (with-output-to-file block-signature-file
+                              #:mode 'binary
+                              #:exists 'truncate/replace
+                              (λ ()
+                                (rdiff-signature basis-block-i (current-output-port))
+                                (file-position (current-output-port)))))
+     
+     
+     (define block-end-position (file-position basis-file-i))
+     (define block-end-time (current-inexact-milliseconds))
+     
+     (if (= block-start-position block-end-position)
+         (begin
+           (write (list 'completed block-end-position) signature-o)
+           (flush-output signature-o)
+           (log-rdiff-sig-proc-debug "~a: completed computed signature for ~a bytes." (now) block-end-position))
+         (begin
+           (write (list 'signature block-start-position block-end-position signature-size) signature-o)
+           (with-input-from-file block-signature-file
+             #:mode 'binary
+             (λ ()
+               (copy-port (current-input-port) signature-o)))
+           (log-rdiff-sig-proc-debug "~a: block ~a [~a - ~a] signature ~a in ~a" 
+                                     (now) 
+                                     block-count 
+                                     block-start-position 
+                                     block-end-position 
+                                     signature-size 
+                                     (milliseconds->string (- block-end-time block-start-time)))
+           (loop (add1 block-count)))))
+   (begin
+     (log-rdiff-sig-proc-debug "~a: removing block signature file ~a" (now) block-signature-file)
+     (delete-file block-signature-file))))
   
   
         
@@ -80,6 +93,10 @@
   (define delta-start-time (current-inexact-milliseconds))
   (define block-signature-file (make-temporary-file "block-signature~a.bin"))
   (log-rdiff-delta-proc-debug "~a: chose ~a for signature working file" (now) block-signature-file)
+  
+  (define block-delta-file (make-temporary-file "block-delta~a.bin"))
+  (log-rdiff-delta-proc-debug "~a: chose ~a for delta working file" (now) block-delta-file)
+  
   (finally 
      (let loop ()
        (match (read signature-i)
@@ -101,16 +118,25 @@
             (λ ()
               (copy-port (make-limited-input-port signature-i signature-length #f) (current-output-port))))
           
-          (define delta-bytes (with-output-to-bytes 
-                               (λ ()
-                                 (define block-i (make-limited-input-port src-i block-size #f))
-                                 (rdiff-delta block-signature-file block-i (current-output-port)))))
+          (define delta-file-length (with-output-to-file
+                                        block-delta-file
+                                      #:mode 'binary
+                                      #:exists 'truncate/replace
+                                      (λ ()
+                                        (define block-i (make-limited-input-port src-i block-size #f))
+                                        (rdiff-delta block-signature-file block-i (current-output-port))
+                                        (file-position (current-output-port)))))
+          
+          (log-rdiff-delta-proc-debug "~a: wrote ~a to delta file" (now) delta-file-length)
           
           ;rdiff delta signature-i src-i delta-o
-          (write (list 'delta block-start block-end (bytes-length delta-bytes)) delta-o)
-          (write-bytes delta-bytes delta-o)
-          (log-rdiff-delta-proc-debug "~a: wrote delta block [~a - ~a] ~a" (now) block-start block-end (bytes-length delta-bytes))
-          (flush-output delta-o)
+          (write (list 'delta block-start block-end delta-file-length) delta-o)
+          (with-input-from-file
+              block-delta-file
+            #:mode 'binary
+            (λ ()
+              (copy-port (current-input-port) delta-o)))
+          (log-rdiff-delta-proc-debug "~a: wrote delta block [~a - ~a] ~a" (now) block-start block-end delta-file-length)
           (loop)]))
      (begin
        (log-rdiff-delta-proc-debug "~a: removing signature working file ~a" (now) block-signature-file)
