@@ -97,6 +97,8 @@
 
 
 (define (guest-lvm-backup-patch-proc basis-file hostname guestname snapshot-time)
+  
+  (define stdout (current-output-port))
   (define-logger guest-lvm-backup-patch)
   (log-guest-lvm-backup-patch-info "~a: starting up" (now))
   
@@ -108,6 +110,15 @@
   
   (finally
    (begin
+     
+     (define snapshot-size (match (read)
+                             [(list 'snapshot-size snapshot-size)
+                              snapshot-size]
+                             [else
+                              (error 'message-not-understood "failed to understand message ~v" else)]))
+     
+     (log-guest-lvm-backup-patch-info "received snapshot size of ~a" snapshot-size)
+     
      (define backup-sha1sum-channel (make-async-channel))
      
      (with-output-to-file temp-filename
@@ -133,13 +144,15 @@
                                 (log-guest-lvm-backup-patch-info "backup sha1sum is ~v" backup-sha1sum)
                                 (async-channel-put backup-sha1sum-channel backup-sha1sum)))))
                      (λ ()
+                       (copy-port-progress (make-progress-reporter stdout snapshot-size) (current-input-port) (current-output-port)))
+                     (λ ()
                        (gzip (current-input-port) (current-output-port)))))))))
      
      (log-guest-lvm-backup-patch-info "comparing sha1sum from snapshot and backup file")
      
      (match (read)
        [(list 'snapshot-sha1sum snapshot-sha1sum)
-        (log-guest-lvm-backup-patch-info "received snapshot sha1sum of ~b" snapshot-sha1sum)
+        (log-guest-lvm-backup-patch-info "received snapshot sha1sum of ~v" snapshot-sha1sum)
         (unless (equal? snapshot-sha1sum (async-channel-get backup-sha1sum-channel))
           (error 'sha1sum-not-matching "sha1sum of original and backup to not match"))]
        [else
@@ -244,13 +257,11 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                  (log-guest-lvm-backup-info "~a: using ~a as basis file for signature" (now) basis-file)
                  
                  (define-values (patch-i to-patch) (make-pipe (* 256 1024)))
-                 (define-values (from-patch patch-o) (make-pipe (* 256 1024)))
-     
+
                  (define snapshot-sha1sum-channel (make-async-channel))
                  
                  (watch (λ ()
-                          (parameterize ([current-output-port patch-o]
-                                         [current-input-port patch-i])
+                          (parameterize ([current-input-port patch-i])
                             (ssh-command remoteuser 
                                          remotehost 
                                          (format "racket -W info guest-lvm-backup/guest-lvm-backup.rkt patch ~a ~a ~a ~a" basis-file (gethostname) guestname snapshot-time)
@@ -270,6 +281,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                                                  (log-guest-lvm-backup-info "sha1sum of snapshot is ~v" sha1sum)
                                                  (async-channel-put snapshot-sha1sum-channel sha1sum)))))
                                       (λ ()
+                                        (write (list 'snapshot-size snapshot-size))
                                         (rdiff-delta-proc from-basis (current-output-port) (current-input-port))
                                         (log-guest-lvm-backup-info "delta process completed")
                                         (write (list 'snapshot-sha1sum (async-channel-get snapshot-sha1sum-channel)))

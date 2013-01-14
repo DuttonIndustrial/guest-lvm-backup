@@ -37,7 +37,7 @@
 (define (rdiff-sig-proc basis-file-i signature-o #:block-size (block-size (* 1024 1024 1024)))
   (define-logger rdiff-sig-proc)
   (define signature-start-time (current-inexact-milliseconds))
-  (log-rdiff-sig-proc-info "~a: computing signature with block size ~a bytes" (now) block-size)
+  (log-rdiff-sig-proc-debug "~a: computing signature with block size ~a bytes" (now) block-size)
   
   (let loop ([block-count 0])
     
@@ -45,7 +45,7 @@
     (define basis-block-i (make-limited-input-port basis-file-i block-size #f))
     (define block-start-time (current-inexact-milliseconds))
     
-    (log-rdiff-sig-proc-info "~a: processing block ~a" (now) block-count)
+    (log-rdiff-sig-proc-debug "~a: processing block ~a" (now) block-count)
     
     (define sig-bytes  (with-output-to-bytes 
                             (λ ()
@@ -58,12 +58,12 @@
         (begin
           (write (list 'completed block-end-position) signature-o)
           (flush-output signature-o)
-          (log-rdiff-sig-proc-info "~a: completed computed signature for ~a bytes." (now) block-end-position))
+          (log-rdiff-sig-proc-debug "~a: completed computed signature for ~a bytes." (now) block-end-position))
         (begin
           (write (list 'signature block-start-position block-end-position (bytes-length sig-bytes)) signature-o)
           (write-bytes sig-bytes signature-o)
           (flush-output signature-o)
-          (log-rdiff-sig-proc-info "~a: block ~a [~a - ~a] signature ~a in ~a" 
+          (log-rdiff-sig-proc-debug "~a: block ~a [~a - ~a] signature ~a in ~a" 
                                    (now) 
                                    block-count 
                                    block-start-position 
@@ -79,7 +79,7 @@
   (define-logger rdiff-delta-proc)
   (define delta-start-time (current-inexact-milliseconds))
   (define block-signature-file (make-temporary-file "block-signature~a.bin"))
-  (log-rdiff-delta-proc-info "~a: chose ~a for signature working file" (now) block-signature-file)
+  (log-rdiff-delta-proc-debug "~a: chose ~a for signature working file" (now) block-signature-file)
   (finally 
      (let loop ()
        (match (read signature-i)
@@ -87,12 +87,12 @@
          [(list 'completed final-position)
           (write (list 'completed final-position) delta-o)
           (flush-output delta-o)
-          (log-rdiff-delta-proc-info "~a completed" (now))]
+          (log-rdiff-delta-proc-debug "~a completed" (now))]
          
          
          [(list 'signature block-start block-end signature-length)
           (define block-size (- block-end block-start))
-          (log-rdiff-delta-proc-info "~a: received signature for block [~a - ~a] with signature size ~a" (now) block-start block-end signature-length)
+          (log-rdiff-delta-proc-debug "~a: received signature for block [~a - ~a] with signature size ~a" (now) block-start block-end signature-length)
           
           ;write the block data to a file
           (with-output-to-file block-signature-file
@@ -109,28 +109,28 @@
           ;rdiff delta signature-i src-i delta-o
           (write (list 'delta block-start block-end (bytes-length delta-bytes)) delta-o)
           (write-bytes delta-bytes delta-o)
-          (log-rdiff-delta-proc-info "~a: wrote delta block [~a - ~a] ~a" (now) block-start block-end (bytes-length delta-bytes))
+          (log-rdiff-delta-proc-debug "~a: wrote delta block [~a - ~a] ~a" (now) block-start block-end (bytes-length delta-bytes))
           (flush-output delta-o)
           (loop)]))
      (begin
-       (log-rdiff-delta-proc-info "~a: removing signature working file ~a" (now) block-signature-file)
+       (log-rdiff-delta-proc-debug "~a: removing signature working file ~a" (now) block-signature-file)
        (delete-file block-signature-file))))
        
 
 (define (rdiff-patch-proc delta-i basis-i new-file-o)
   (define-logger rdiff-patch-proc)
   (define block-delta-file (make-temporary-file "block-delta~a.bin"))
-  (log-rdiff-patch-proc-info "chose ~a for delta working file" block-delta-file)
+  (log-rdiff-patch-proc-debug "chose ~a for delta working file" block-delta-file)
   
   (define block-basis-file (make-temporary-file "block-basis~a.bin"))
-  (log-rdiff-patch-proc-info "chose ~a for basis working file" block-basis-file)
+  (log-rdiff-patch-proc-debug "chose ~a for basis working file" block-basis-file)
   
   (finally
    (let loop ()
      (match (read delta-i)
        [(list 'delta block-start block-end delta-length)
         (define block-size (- block-end block-start))
-        (log-rdiff-patch-proc-info "processing block ~a - ~a delta-length ~a" block-start block-end delta-length)
+        (log-rdiff-patch-proc-debug "processing block ~a - ~a delta-length ~a" block-start block-end delta-length)
         
         ;write the delta block data to a file
         (with-output-to-file block-delta-file
@@ -149,12 +149,12 @@
         (loop)]
        
        [(list 'completed final-position)
-        (log-rdiff-patch-proc-info "completed patching")]))
+        (log-rdiff-patch-proc-debug "completed patching")]))
    
    (begin
-     (log-rdiff-patch-proc-info "removing delta working file ~a" block-delta-file)
+     (log-rdiff-patch-proc-debug "removing delta working file ~a" block-delta-file)
      (delete-file block-delta-file)
-     (log-rdiff-patch-proc-info "removing basis working file ~a" block-basis-file)
+     (log-rdiff-patch-proc-debug "removing basis working file ~a" block-basis-file)
      (delete-file block-basis-file))))
 
   
