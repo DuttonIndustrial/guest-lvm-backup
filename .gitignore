@@ -1,3 +1,5 @@
 compiled/*
 test-dst
 test-src
+private/compiled
+*.1

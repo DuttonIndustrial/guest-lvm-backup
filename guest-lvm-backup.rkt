@@ -11,14 +11,14 @@
          racket/path
          racket/port
          racket/system
-         "control.rkt"
-         "gzip.rkt"
-         "lvm.rkt"
-         "progress.rkt"
-         "rdiff.rkt"
-         "ssh.rkt"
-         "time.rkt"
-         "virsh.rkt")
+         "private/control.rkt"
+         "private/gzip.rkt"
+         "private/lvm.rkt"
+         "private/progress.rkt"
+         "private/rdiff.rkt"
+         "private/ssh.rkt"
+         "private/time.rkt"
+         "private/virsh.rkt")
 
 
 (define (remote-basis-filename hostname guestname seconds)
