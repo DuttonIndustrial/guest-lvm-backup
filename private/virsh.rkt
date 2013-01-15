@@ -16,11 +16,10 @@
   (let ([output (open-output-string)])
     (unless (parameterize ([current-output-port output]
                            [current-error-port output])
-              (system "virsh list --name"))
+              (system "virsh list"))
       (error 'virsh "failed to list guest operating systems with virsh. output: ~a" (get-output-string output)))
-      (regexp-match? (format "(?mi:^~a$)" (regexp-quote name)) (get-output-string output))))
-  
-  
+      (regexp-match? (pregexp (format "\\s~a\\s") (regexp-quote name)) (get-output-string output))))
+
 (define (shutdown-guest name #:timeout (timeout 30) #:poll (poll 1))
   (unless (guest-running? name)
     (error 'shutdown-guest "guest ~a not running" name))
