@@ -34,7 +34,7 @@
 
 
 
-(define (rdiff-sig-proc basis-file-i signature-o #:block-size (block-size (* 1024 1024 1024)))
+(define (rdiff-sig-proc basis-file-i signature-o block-size)
   (define-logger rdiff-sig-proc)
   (define signature-start-time (current-inexact-milliseconds))
   (log-rdiff-sig-proc-debug "~a: computing signature with block size ~a bytes" (now) block-size)

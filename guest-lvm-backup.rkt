@@ -101,7 +101,7 @@
                                    (if (log-level) 
                                        (format "--log-level ~a" (log-level))
                                        "")
-                                   (gethostname) 
+                                   (gethostname)
                                    guest-name)
                            #:user (ssh-user)
                            #:port (ssh-port)
@@ -157,12 +157,9 @@
                  
                  (pipeline (λ ()
                              (ssh-command remote-host 
-                                          (format "guest-lvm-signature ~a ~a ~a"
+                                          (format "guest-lvm-signature ~a ~a"
                                                   (if (log-level) 
                                                       (format "--log-level ~a" (log-level))
-                                                      "")
-                                                  (if (progress?)
-                                                      "--progress"
                                                       "")
                                                   basis-file)
                                           #:user (ssh-user)
@@ -186,9 +183,12 @@
                            
                            (λ ()
                              (ssh-command remote-host 
-                                          (format "guest-lvm-patch ~a ~a ~a ~a ~a"
+                                          (format "guest-lvm-patch ~a ~a ~a ~a ~a ~a"
                                                   (if (log-level) 
                                                       (format "--log-level ~a" (log-level))
+                                                      "")
+                                                  (if (progress?)
+                                                      "--progress"
                                                       "")
                                                   basis-file 
                                                   (gethostname) 
