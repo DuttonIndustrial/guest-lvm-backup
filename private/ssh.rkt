@@ -11,10 +11,10 @@
 ;to the program on the other side of the terminal.
 ;this program will then wait for its exit.
 ;all input is sent via current-input-port, current-output-port, current-error-port
-(define (ssh-command username host command #:port (port #f) #:identity (identity #f))
-  (let ([commandline (format "ssh ~a@~a ~a ~a '~a'" 
-                          username 
+(define (ssh-command host command #:user (user #f) #:port (port #f) #:identity (identity #f))
+  (let ([commandline (format "ssh ~a ~a ~a '~a'"  
                           host 
+                          (if user (format "-l ~a" user) "")
                           (if port (format "-p ~a" port) "")
                           (if identity (format "-i ~a" identity) "")
                           command)])
