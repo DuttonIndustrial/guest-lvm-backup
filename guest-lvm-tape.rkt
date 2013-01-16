@@ -52,7 +52,7 @@
                (progress #t)]
  
  #:multi
- ["--email-to" to
+ ["--mail-to" to
         "Send email to user upon completion"
         (email-to (cons to (email-to)))]
  
