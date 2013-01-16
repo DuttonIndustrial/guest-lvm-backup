@@ -29,6 +29,8 @@
 
 (define eject (make-parameter #f))
 
+(define progress (make-parameter #f))
+
 (command-line
  #:program "guest-lvm-tape"
           
@@ -37,7 +39,7 @@
    "Eject the tape after completion"
    (eject #t)]
 
- [("-g") guest
+ ["-g" guest
          "Shutdown/restart guest prior to snapshotting"
          (guest-name guest)]
  
@@ -45,6 +47,9 @@
                   "log racket messages to standard-error port."
                   "accepts one of debug info warning error fatal"
                   (log-level (parse-logging-level ll))]
+ 
+ ["--progress" "write backup progress to standard output."
+               (progress #t)]
  
  #:multi
  ["--email-to" to
@@ -66,17 +71,17 @@
   (λ (exn)
     (unless (empty? (email-to))
       (send-mail-message #f
-                         (format "Tape backup failed: ~a" (exn-message exn))
+                         (format "Tape backup failed: unexpected error")
                          (email-to)
                          empty
                          empty
-                         (list "Attempted tape backup failed. A tape needs to be loaded"
-                               (format "Host: ~a" (gethostname))
-                               (format "Device: ~a" device)
-                               (when (guest-name)
-                                 (format "Guest: ~a" (guest-name)))
-                               (format "Volume: ~a" lvm-disk-path))
-                         #f))
+                         (port->lines 
+                          (open-input-string 
+                           (with-output-to-string
+                            (λ ()
+                              (printf "An unexpected error occured~n")
+                              (printf "Error: ~a~n~n"  (exn-message exn))))))
+                         ""))
     exn)
   (λ ()
   (unless (logical-volume-exists? lvm-disk-path)
@@ -86,30 +91,30 @@
   (log-guest-lvm-tape-info "~a: volume size is ~a bytes" (now) volume-size)
     
   (unless (mt-online? device)
-    (error 'no-tape "tape ~a doesn't appear to be online" device))
+    (error 'no-tape "tape ~a doesn't appear to be online. Do you need to load a new one?" device))
   
   (if (guest-name)
       (begin
-        (printf "~a: shutting down guest ~a~n" (now) guest-name)
-        (shutdown-guest guest-name)
+        (printf "~a: shutting down guest ~a~n" (now) (guest-name))
+        (shutdown-guest (guest-name))
   
         (finally (begin
                    (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
                    (snapshot-logical-volume lvm-disk-path snapshot-name "10G"))
                  (begin
-                   (printf "~a: starting guest ~a~n" (now) guest-name)
-                   (start-guest guest-name))))
+                   (printf "~a: starting guest ~a~n" (now) (guest-name))
+                   (start-guest (guest-name)))))
       (begin
         (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
         (snapshot-logical-volume lvm-disk-path snapshot-name "10G")))
   
   (finally
    (begin
-     (log-guest-lvm-tape-info "~a: rewinding" (now) device)
+     (printf "~a: rewinding ~a~n" (now) device)
      (mt-rewind device)
    
      ;write snapshot name and time to first tape file
-     (log-guest-lvm-tape-info "~a: writing snapshot information" (now) device)
+     (printf "~a: writing snapshot information to ~a~n" (now) device)
      (with-output-to-file device
        #:mode 'binary
        #:exists 'update
@@ -124,13 +129,15 @@
          (printf "time: ~a~n" snapshot-time)))
      
      ;write snapshot gzip file to second tape device
-     (log-guest-lvm-tape-info "~a: writing snapshot volume to ~a" (now) device)
+     (printf "~a: writing snapshot volume to ~a~n" (now) device)
      (pipeline
       (λ ()
         (with-input-from-file snapshot-logical-path
                                #:mode 'binary
                                (λ ()
-                                 (copy-port-progress (make-progress-reporter std-out volume-size) (current-input-port) (current-output-port)))))
+                                 (if (progress)
+                                     (copy-port-progress (make-progress-reporter std-out volume-size) (current-input-port) (current-output-port))
+                                     (copy-port (current-input-port) (current-output-port))))))
       (λ ()
         (with-output-to-file device
           #:mode 'binary
@@ -143,32 +150,41 @@
      (mt-weof device)
    
      
-     (log-guest-lvm-tape-info "~a: rewinding device ~a" (now) device)
+     (printf "~a: rewinding device ~a~n" (now) device)
      (mt-rewind device)
    
      (when (eject)
-       (log-guest-lvm-tape-info "~a: ejecting device" (now) device)
+       (printf "~a: ejecting device ~a~n" (now) device)
        (mt-offline device))
    
      (unless (empty? (email-to))
+       (printf "~a: sending email to ~a~n" (now) (email-to))
        (send-mail-message #f
                          "Tape backup completed."
                          (email-to)
                          empty
                          empty
-                         (list "Tape backup succeeded"
-                               (when (eject)
-                                 "A new tape needs to be loaded.")
-                               (format "Host: ~a" (gethostname))
-                               (when (guest-name)
-                                 (format "Guest: ~a" (guest-name)))
-                               (format "Volume: ~a" lvm-disk-path)
-                               (format "Device: ~a" device)
-                               (format "Size: ~a" volume-size)
-                               (format "Snapshot time: ~a" snapshot-time))
-                         #f)))
-    (begin
-     (log-guest-lvm-tape-info "~a: removing logical volume ~a" (now) snapshot-logical-path)
+                         (port->lines 
+                          (open-input-string 
+                           (with-output-to-string
+                            (λ ()
+                              (printf "Tape backup succeeded~n")
+                              
+                              (when (eject)
+                                (printf "A new tape needs to be loaded.~n"))
+                              
+                              (printf "Host: ~a~n" (gethostname))
+                              
+                              (when (guest-name)
+                                (printf "Guest: ~a~n" (guest-name)))
+                              
+                              (printf "Volume: ~a~n" lvm-disk-path)
+                              (printf "Device: ~a~n" device)
+                              (printf "Size: ~a~n" volume-size)
+                              (printf "Snapshot time: ~a~n" snapshot-time)))))
+                          "")))
+     (begin
+     (printf "~a: removing logical volume ~a~n" (now) snapshot-logical-path)
      (remove-logical-volume snapshot-logical-path))))))
   
   

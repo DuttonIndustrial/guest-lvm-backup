@@ -13,6 +13,7 @@
          racket/system
          "private/control.rkt"
          "private/gzip.rkt"
+         "private/logger.rkt"
          "private/lvm.rkt"
          "private/progress.rkt"
          "private/rdiff.rkt"
@@ -187,7 +188,7 @@ copies up the difference to remote host with remote user using the remotebasis_n
 
 remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
 |#
-(define (guest-lvm-backup guestname lvmdiskpath remoteuser remotehost #:volume-size (volume-size 10) #:identity (identity #f) #:port (port #f))
+(define (guest-lvm-backup-proc guestname lvmdiskpath remoteuser remotehost #:volume-size (volume-size 10) #:identity (identity #f) #:port (port #f))
   (define-logger guest-lvm-backup)
   
   (define std-out (current-output-port))
@@ -329,6 +330,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
 (define ssh-port (make-parameter #f))
 (define ssh-identity (make-parameter #f))
 (define log-level (make-parameter #f))
+(define guest-name (make-parameter #f))
 
 (command-line
  #:program "guest-lvm-backup"
@@ -341,36 +343,23 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                   "Use ssh port"
                   (ssh-port port)]
  
+ [("-g" "--guest") guest
+                   "Guest to shutdown and restart prior to snapshot creation"
+                   (guest-name guest)]
+ 
  [("--log-level") ll
-                 "racket log level to output to standard-error port"
-                 (log-level (match ll
-                              ["debug"
-                               'debug]
-                              ["info"
-                               'info]
-                              ["warning"
-                               'warning]
-                              ["error"
-                               'error]
-                              ["fatal"
-                               'fatal]
-                              [else
-                               (error 'log-level "log level must be one of (fatal error warning info debug)")]))]
+                 "log racket messages to standard-error port."
+                 "accepts one of debug info warning error fatal"
+                 (log-level (parse-logging-level ll))]
  
  
  
  #:args args
  (begin
    ;setup logging
-   (define logging-thread (if (log-level)
-                            (thread (λ ()
-                                      (define lr (make-log-receiver (current-logger) (log-level) #f))
-                                      (let loop ()
-                                        (let ([msg (sync lr)])
-                                          (eprintf "~a~n" (vector-ref msg 1)))
-                                        (loop))))
-                            #f))
- 
+   (when (log-level)
+     (start-logging (log-level)))
+   
    
  (match args
    [(list "locate" hostname guestname)
@@ -386,7 +375,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
     (guest-lvm-backup-patch-proc basis-file hostname guestname snapshot-time)]
    
    [(list guestname lvmdiskpath remoteuser remotehost)
-    (guest-lvm-backup guestname lvmdiskpath remoteuser remotehost #:port (ssh-port) #:identity (ssh-identity))]
+    (guest-lvm-backup-proc guestname lvmdiskpath remoteuser remotehost #:port (ssh-port) #:identity (ssh-identity))]
    
    [else
     (error 'bad-arguments "commandline not recognized ~a" else)])))

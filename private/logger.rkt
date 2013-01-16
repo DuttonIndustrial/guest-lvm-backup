@@ -29,7 +29,8 @@
                                  (define lr (make-log-receiver (current-logger) level #f))
                                  (let loop ()
                                    (let ([msg (sync lr)])
-                                     (eprintf "~a~n" (vector-ref msg 1)))
-                                   (loop))))))
+                                     (eprintf "~a~n" (vector-ref msg 1))
+                                     (flush-output (current-error-port))
+                                   (loop)))))))
 
 
