@@ -222,7 +222,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
      (pipeline (λ ()
                  (ssh-command remoteuser 
                               remotehost 
-                              (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a locate ~a ~a" 
+                              (format "guest-lvm-backup ~a locate ~a ~a" 
                                       (if (log-level) 
                                           (format "--log-level ~a" (log-level))
                                           "")
@@ -258,7 +258,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                               (λ ()
                                 (ssh-command remoteuser 
                                              remotehost 
-                                             (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a full-backup ~a ~a ~a" 
+                                             (format "guest-lvm-backup ~a full-backup ~a ~a ~a" 
                                                      (if (log-level) 
                                                          (format "--log-level ~a" (log-level))
                                                          "")
@@ -280,7 +280,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                     (pipeline (λ ()
                                 (ssh-command remoteuser 
                                              remotehost 
-                                             (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a signature ~a "
+                                             (format "guest-lvm-backup ~a signature ~a "
                                                      (if (log-level) 
                                                          (format "--log-level ~a" (log-level))
                                                          "")
@@ -306,7 +306,7 @@ remotebasisname files are actually (format "~a_(secondssnapshottime).gz")
                               (λ ()
                                 (ssh-command remoteuser 
                                              remotehost 
-                                             (format "racket guest-lvm-backup/guest-lvm-backup.rkt ~a patch ~a ~a ~a ~a"
+                                             (format "guest-lvm-backup ~a patch ~a ~a ~a ~a"
                                                      (if (log-level) 
                                                          (format "--log-level ~a" (log-level))
                                                          "")

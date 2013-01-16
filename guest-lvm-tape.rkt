@@ -70,7 +70,7 @@
  (call-with-exception-handler 
   (λ (exn)
     (unless (empty? (email-to))
-      (send-mail-message #f
+      (send-mail-message (gethostname)
                          (format "Tape backup failed: unexpected error")
                          (email-to)
                          empty
@@ -159,7 +159,7 @@
    
      (unless (empty? (email-to))
        (printf "~a: sending email to ~a~n" (now) (email-to))
-       (send-mail-message #f
+       (send-mail-message (gethostname)
                          "Tape backup completed."
                          (email-to)
                          empty
