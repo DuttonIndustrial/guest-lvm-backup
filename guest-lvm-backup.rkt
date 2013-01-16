@@ -31,6 +31,8 @@
 (define log-level (make-parameter #f))
 (define shutdown-guest? (make-parameter #t))
 (define progress? (make-parameter #f))
+(define snapshot-size (make-parameter "5G"))
+(define block-size (make-parameter (* 512 1024 1024)))
 
 (command-line
  #:program "guest-lvm-backup"
@@ -48,13 +50,24 @@
                  (ssh-user user)]
  
  [("--no-shutdown-guest") guest
-              "Guest to shutdown and restart prior to snapshot creation"
+              "Do not shutdown guest prior to snapshot creation"
+              "You can also specify this if the guest is already shutdown"
               (shutdown-guest #f)]
+ 
+ [("--snapshot-size") ss
+              "Size of lvm device snapshot."
+              "Default is 5G"
+              (snapshot-size ss)]
  
  [("--log-level") ll
                  "log racket messages to standard-error port."
                  "accepts one of debug info warning error fatal"
                  (log-level (parse-logging-level ll))]
+ 
+ [("--block-size") bs
+                   "set transfer block size in bytes"
+                   "the default is 512Mb"
+                   (block-size (string->number bs))]
  
  [("--progress") "Show backup progress"
                  (progress? #t)]
@@ -81,15 +94,21 @@
  (unless (logical-volume-exists? lvm-disk-path)
    (error 'no-volume "logical volume ~v does not exist." lvm-disk-path))
  
- (printf "~a: shutting down guest ~a~n" (now) guest-name)
- (shutdown-guest guest-name)
+ (if (shutdown-guest)
+     (begin
+       (printf "~a: shutting down guest ~a~n" (now) guest-name)
+       (shutdown-guest guest-name)
  
- (finally (begin
-            (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
-            (snapshot-logical-volume lvm-disk-path snapshot-name "10G"))
-          (begin
-            (printf "~a: starting guest ~a~n" (now) guest-name)
-            (start-guest guest-name)))
+       (finally (begin
+                  (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
+                  (snapshot-logical-volume lvm-disk-path snapshot-name "10G"))
+                (begin
+                  (printf "~a: starting guest ~a~n" (now) guest-name)
+                  (start-guest guest-name))))
+     (begin
+       (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
+       (snapshot-logical-volume lvm-disk-path snapshot-name (snapshot-size))))
+       
  
  (define volume-size (logical-volume-size lvm-disk-path))
  (log-guest-lvm-backup-info "~a: volume size is ~a bytes" (now) volume-size)
@@ -157,11 +176,12 @@
                  
                  (pipeline (λ ()
                              (ssh-command remote-host 
-                                          (format "guest-lvm-signature ~a ~a"
+                                          (format "guest-lvm-signature ~a ~a ~a"
                                                   (if (log-level) 
                                                       (format "--log-level ~a" (log-level))
                                                       "")
-                                                  basis-file)
+                                                  basis-file
+                                                  (block-size))
                                           #:user (ssh-user)
                                           #:port (ssh-port)
                                           #:identity (ssh-identity)))
@@ -198,8 +218,7 @@
                                           #:port (ssh-port)
                                           #:identity (ssh-identity))))
                  
-                 (printf "~a: completed differential backup~n" (now))
-                 (log-guest-lvm-backup-info "completed backup!")]
+                 (printf "~a: completed differential backup~n" (now))]
                 
                 [else
                  (error 'unknown-message "~v" else)])))

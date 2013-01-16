@@ -10,22 +10,16 @@
 
 
 (define log-level (make-parameter #f))
-(define block-size (make-parameter (* 512 1024 1024)))
 
 (command-line
- #:program "guest-lvm-backup"
+ #:program "guest-lvm-signature"
  #:once-each 
  [("--log-level") ll
                  "log racket messages to standard-error port."
                  "accepts one of debug info warning error fatal"
                  (log-level (parse-logging-level ll))]
- 
- [("--block-size") bs
-                   "set transfer block size in bytes"
-                   "the default is 512Mb"
-                   (block-size (string->number bs))]
- 
- #:args (basis-file)
+
+ #:args (basis-file block-size)
  
  ;setup logging
  (when (log-level)
@@ -39,7 +33,7 @@
                (λ ()
                  (gunzip (current-input-port) (current-output-port)))))
            (λ ()
-             (rdiff-sig-proc (current-input-port) (current-output-port) (block-size)))))
+             (rdiff-sig-proc (current-input-port) (current-output-port) block-size))))
           
 
 
