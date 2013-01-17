@@ -12,17 +12,17 @@
   (define link-destination (info 'launcher-link-destination))
            
   (for-each (λ (launcher)
-              (let ([to (simplify-path (build-path link-destination launcher))]
-                    [path (build-path racket-install-dir "bin" launcher)])
+              (let ([target-path (build-path racket-install-dir "bin" launcher)]
+                    [destination-path (build-path link-destination launcher)])
                 
-                (printf "~a link ~a -> ~a~n" (if (link-exists? path)
+                (printf "~a link ~a -> ~a~n" (if (link-exists? destination-path)
                                                  (begin
-                                                   (delete-file path)
+                                                   (delete-file target-path)
                                                    "updating")
                                                  "creating")
-                        to path)
+                        destination-path target-path)
                 
-                (make-file-or-directory-link to path)))
+                (make-file-or-directory-link destination-path target-path)))
                 
             (info 'racket-launcher-names)))
                        
