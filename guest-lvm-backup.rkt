@@ -29,7 +29,7 @@
 (define ssh-identity (make-parameter #f))
 (define ssh-user (make-parameter #f))
 (define log-level (make-parameter #f))
-(define shutdown-guest? (make-parameter #t))
+(define no-shutdown-guest? (make-parameter #f))
 (define progress? (make-parameter #f))
 (define snapshot-size (make-parameter "5G"))
 (define block-size (make-parameter (* 512 1024 1024)))
@@ -52,7 +52,7 @@
  [("--no-shutdown-guest") guest
               "Do not shutdown guest prior to snapshot creation"
               "You can also specify this if the guest is already shutdown"
-              (shutdown-guest #f)]
+              (no-shutdown-guest? #t)]
  
  [("--snapshot-size") ss
               "Size of lvm device snapshot."
@@ -94,7 +94,10 @@
  (unless (logical-volume-exists? lvm-disk-path)
    (error 'no-volume "logical volume ~v does not exist." lvm-disk-path))
  
- (if (shutdown-guest)
+ (if (no-shutdown-guest?)
+     (begin
+       (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
+       (snapshot-logical-volume lvm-disk-path snapshot-name (snapshot-size)))
      (begin
        (printf "~a: shutting down guest ~a~n" (now) guest-name)
        (shutdown-guest guest-name)
@@ -104,10 +107,7 @@
                   (snapshot-logical-volume lvm-disk-path snapshot-name "10G"))
                 (begin
                   (printf "~a: starting guest ~a~n" (now) guest-name)
-                  (start-guest guest-name))))
-     (begin
-       (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
-       (snapshot-logical-volume lvm-disk-path snapshot-name (snapshot-size))))
+                  (start-guest guest-name)))))
        
  
  (define volume-size (logical-volume-size lvm-disk-path))
