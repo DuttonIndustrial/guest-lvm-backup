@@ -8,20 +8,22 @@
 
 
 (define (installer racket-install-dir collection-dir)
-  (printf "~v~n" racket-install-dir)
-  (printf "~v~n" collection-dir)
-  
   (define info (get-info/full collection-dir))
   (define link-destination (info 'launcher-link-destination))
            
   (for-each (λ (launcher)
-              (let ([target-path (build-path link-destination launcher)])
-                (when (link-exists? target-path)
-                  (printf "removing old link  ~a~n" target-path)
-                  (delete-file target-path))
-                  
-                (printf "creating link ~a~n" target-path)
-                (make-file-or-directory-link (build-path collection-dir "bin" launcher) target-path)))
+              (let ([target-path (build-path racket-install-dir "bin" launcher)]
+                    [destination-path (build-path link-destination launcher)])
+                
+                (printf "~a link ~a -> ~a~n" (if (link-exists? destination-path)
+                                                 (begin
+                                                   (delete-file target-path)
+                                                   "updating")
+                                                 "creating")
+                        destination-path target-path)
+                
+                (make-file-or-directory-link destination-path target-path)))
+                
             (info 'racket-launcher-names)))
                        
               
