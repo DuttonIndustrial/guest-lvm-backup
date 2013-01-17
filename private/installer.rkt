@@ -15,12 +15,12 @@
               (let ([to (build-path link-destination launcher)]
                     [path (simplify-path (build-path racket-install-dir "bin" launcher))])
                 
-                (printf "~a link ~a -> ~a~n" (if (link-exists? path)
+                (printf "~a link ~a -> ~a~n" (if (link-exists? to)
                                                  (begin
-                                                   (delete-file path)
+                                                   (delete-file to)
                                                    "updating")
                                                  "creating")
-                        to path)
+                        path to)
                 
                 (make-file-or-directory-link path to)))
                 
