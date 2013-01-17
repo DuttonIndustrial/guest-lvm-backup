@@ -8,6 +8,9 @@
 
 
 (define (post-installer racket-install-dir collection-dir)
+  (printf "~v~n" racket-install-dir)
+  (printf "~v~n" collection-dir)
+  
   (define info (get-info/full collection-dir))
   (define link-destination (info 'launcher-link-destination))
            
