@@ -37,7 +37,7 @@
  ["--eject" "Eject the tape after completion"
             (eject #t)]
 
- [("--no-shutdown-guest") guest
+ [("--no-shutdown-guest")
               ("Do not shutdown guest prior to snapshot creation"
               "You can also specify this if the guest is already shutdown")
               (no-shutdown-guest? #t)]
@@ -47,7 +47,7 @@
                   "accepts one of debug info warning error fatal")
                   (log-level (parse-logging-level ll))]
  
- [("-p" "--progress") "write backup progress to standard output."
+ [("-p" "--progress") ("write backup progress to standard output.")
                       (printf "setting progress~n")
                       (progress? #t)]
  
@@ -131,9 +131,6 @@
             (printf "volume: ~a~n" lvm-disk-path)
             
             (printf "time: ~a~n" snapshot-time)))
-        
-        (printf "progress? ~a" (progress?))
-  
         
         ;write snapshot gzip file to second tape device
         (printf "~a: writing snapshot volume to ~a~n" (now) device)

@@ -55,7 +55,7 @@
                  "Use ssh user"
                  (ssh-user user)]
  
- [("--no-shutdown-guest") guest
+ [("--no-shutdown-guest")
               ("Do not shutdown guest prior to snapshot creation"
               "You can also specify this if the guest is already shutdown")
               (no-shutdown-guest? #t)]
