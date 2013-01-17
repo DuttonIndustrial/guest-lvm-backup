@@ -4,10 +4,10 @@
 (require racket/system
          setup/getinfo)
 
-(provide post-installer)
+(provide installer)
 
 
-(define (post-installer racket-install-dir collection-dir)
+(define (installer racket-install-dir collection-dir)
   (printf "~v~n" racket-install-dir)
   (printf "~v~n" collection-dir)
   
