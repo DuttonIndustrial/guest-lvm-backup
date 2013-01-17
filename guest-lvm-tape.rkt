@@ -22,7 +22,7 @@
 (define log-level (make-parameter #f))
 (define mail-to (make-parameter empty))
 (define eject (make-parameter #f))
-(define progress (make-parameter #f))
+(define show-progress (make-parameter #f))
 (define no-shutdown-guest? (make-parameter #f))
 (define snapshot-size (make-parameter "5G"))
 
@@ -47,8 +47,8 @@
                   "accepts one of debug info warning error fatal")
                   (log-level (parse-logging-level ll))]
  
- ["--progress" "write backup progress to standard output."
-               (progress #t)]
+ [("-p" "--progress") "write backup progress to standard output."
+                      (show-progress #t)]
  
  [("--snapshot-size") ss
               ("Size of lvm device snapshot."
@@ -139,7 +139,7 @@
            (with-input-from-file snapshot-logical-path
              #:mode 'binary
              (λ ()
-               (if (progress)
+               (if (show-progress)
                    (copy-port-progress (make-progress-reporter std-out volume-size) (current-input-port) (current-output-port))
                    (copy-port (current-input-port) (current-output-port))))))
          (λ ()
