@@ -22,7 +22,7 @@
                                                  "creating")
                         to path)
                 
-                (make-file-or-directory-link to path)))
+                (make-file-or-directory-link path to)))
                 
             (info 'racket-launcher-names)))
                        
