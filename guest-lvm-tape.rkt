@@ -102,15 +102,15 @@
            (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
            (snapshot-logical-volume lvm-disk-path snapshot-name (snapshot-size)))
          (begin
-           (printf "~a: shutting down guest ~a~n" (now) (guest-name))
-           (shutdown-guest (guest-name))
+           (printf "~a: shutting down guest ~a~n" (now) guest-name)
+           (shutdown-guest guest-name)
            
            (finally (begin
                       (printf "~a: snapshotting ~a as ~a~n" (now) lvm-disk-path snapshot-logical-path)
                       (snapshot-logical-volume lvm-disk-path snapshot-name (snapshot-size)))
                     (begin
-                      (printf "~a: starting guest ~a~n" (now) (guest-name))
-                      (start-guest (guest-name))))))
+                      (printf "~a: starting guest ~a~n" (now) guest-name)
+                      (start-guest guest-name)))))
      
      (finally
       (begin
@@ -123,8 +123,8 @@
           #:mode 'binary
           #:exists 'update
           (λ ()
-            (when (guest-name)
-              (printf "guest: ~a~n" (guest-name)))
+            (when guest-name
+              (printf "guest: ~a~n" guest-name))
             
             (printf "size: ~a~n" volume-size)
             
