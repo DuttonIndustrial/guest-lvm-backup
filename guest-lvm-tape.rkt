@@ -22,7 +22,7 @@
 (define log-level (make-parameter #f))
 (define mail-to (make-parameter empty))
 (define eject (make-parameter #f))
-(define show-progress (make-parameter #f))
+(define show-progress? (make-parameter #f))
 (define no-shutdown-guest? (make-parameter #f))
 (define snapshot-size (make-parameter "5G"))
 
@@ -48,7 +48,7 @@
                   (log-level (parse-logging-level ll))]
  
  [("-p" "--progress") "write backup progress to standard output."
-                      (show-progress #t)]
+                      (show-progress? #t)]
  
  [("--snapshot-size") ss
               ("Size of lvm device snapshot."
@@ -69,7 +69,6 @@
   (define snapshot-name (format "~a-backup-~a" (file-name-from-path lvm-disk-path)  snapshot-time))
 
   (define snapshot-logical-path (apply build-path (append (explode-path (path-only lvm-disk-path)) (list snapshot-name))))
-  
   
   (call-with-exception-handler 
    (λ (exn)
@@ -132,6 +131,9 @@
             
             (printf "time: ~a~n" snapshot-time)))
         
+        (printf "progress? ~a" (show-progress?))
+  
+        
         ;write snapshot gzip file to second tape device
         (printf "~a: writing snapshot volume to ~a~n" (now) device)
         (pipeline
@@ -139,7 +141,7 @@
            (with-input-from-file snapshot-logical-path
              #:mode 'binary
              (λ ()
-               (if (show-progress)
+               (if (show-progress?)
                    (copy-port-progress (make-progress-reporter std-out volume-size) (current-input-port) (current-output-port))
                    (copy-port (current-input-port) (current-output-port))))))
          (λ ()
