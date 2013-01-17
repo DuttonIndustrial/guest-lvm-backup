@@ -50,23 +50,23 @@
                  (ssh-user user)]
  
  [("--no-shutdown-guest") guest
-              "Do not shutdown guest prior to snapshot creation"
-              "You can also specify this if the guest is already shutdown"
+              ("Do not shutdown guest prior to snapshot creation"
+              "You can also specify this if the guest is already shutdown")
               (no-shutdown-guest? #t)]
  
  [("--snapshot-size") ss
-              "Size of lvm device snapshot."
-              "Default is 5G"
+              ("Size of lvm device snapshot."
+              "Default is 5G")
               (snapshot-size ss)]
  
  [("--log-level") ll
-                 "log racket messages to standard-error port."
-                 "accepts one of debug info warning error fatal"
+                 ("log racket messages to standard-error port."
+                 "accepts one of debug info warning error fatal")
                  (log-level (parse-logging-level ll))]
  
  [("--block-size") bs
-                   "set transfer block size in bytes"
-                   "the default is 512Mb"
+                   ("set transfer block size in bytes"
+                   "the default is 512Mb")
                    (block-size (string->number bs))]
  
  [("--progress") "Show backup progress"

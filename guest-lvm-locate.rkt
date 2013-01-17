@@ -12,8 +12,8 @@
  #:program "guest-lvm-locate"
  #:once-each 
  [("--log-level") ll
-                 "log racket messages to standard-error port."
-                 "accepts one of debug info warning error fatal"
+                 ("log racket messages to standard-error port."
+                 "accepts one of debug info warning error fatal")
                  (log-level (parse-logging-level ll))]
  
  #:args (hostname guestname)

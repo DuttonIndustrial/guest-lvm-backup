@@ -35,17 +35,16 @@
  #:program "guest-lvm-tape"
           
  #:once-each 
- ["--eject"
-   "Eject the tape after completion"
-   (eject #t)]
+ ["--eject" "Eject the tape after completion"
+            (eject #t)]
 
  ["-g" guest
          "Shutdown/restart guest prior to snapshotting"
          (guest-name guest)]
  
  [("--log-level") ll
-                  "log racket messages to standard-error port."
-                  "accepts one of debug info warning error fatal"
+                  ("log racket messages to standard-error port."
+                  "accepts one of debug info warning error fatal")
                   (log-level (parse-logging-level ll))]
  
  ["--progress" "write backup progress to standard output."
