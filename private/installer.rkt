@@ -20,7 +20,7 @@
                                                    (delete-file to)
                                                    "updating")
                                                  "creating")
-                        path to)
+                        to path)
                 
                 (make-file-or-directory-link path to)))
                 
