@@ -33,7 +33,7 @@
                (λ ()
                  (gunzip (current-input-port) (current-output-port)))))
            (λ ()
-             (rdiff-sig-proc (current-input-port) (current-output-port) block-size))))
+             (rdiff-sig-proc (current-input-port) (current-output-port) (string->number block-size)))))
           
 
 
