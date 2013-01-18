@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require mzlib/os
+         net/sendmail
          openssl/sha1
          racket/async-channel
          racket/cmdline
@@ -21,10 +22,11 @@
          "private/remote-backup.rkt"
          "private/ssh.rkt"
          "private/time.rkt"
-         "private/virsh.rkt")
+         "private/virsh.rkt"
+         "version.rkt")
 
 
-
+(define mail-to (make-parameter empty))
 (define ssh-port (make-parameter #f))
 (define ssh-identity (make-parameter #f))
 (define ssh-user (make-parameter #f))
@@ -37,6 +39,10 @@
 (command-line
  #:program "guest-lvm-backup"
  #:once-each 
+ [("-v" "--version") "Print current version and exit."
+                     (printf "Version: ~a~n" (current-version))
+                     (exit 0)]
+ 
  [("--ssh-identity") identity 
                      "Use ssh identity file"
                      (ssh-identity identity)]
@@ -49,7 +55,7 @@
                  "Use ssh user"
                  (ssh-user user)]
  
- [("--no-shutdown-guest") guest
+ [("--no-shutdown-guest")
               ("Do not shutdown guest prior to snapshot creation"
               "You can also specify this if the guest is already shutdown")
               (no-shutdown-guest? #t)]
@@ -72,6 +78,11 @@
  [("--progress") "Show backup progress"
                  (progress? #t)]
  
+ #:multi
+ ["--mail-to" to
+        "Send mail to user upon completion or failure"
+        (mail-to (cons to (mail-to)))]
+ 
  #:args (guest-name lvm-disk-path remote-host)
  
  ;setup logging
@@ -90,6 +101,24 @@
  
  (define snapshot-logical-path (apply build-path (append (explode-path (path-only lvm-disk-path)) (list snapshot-name))))
  
+ 
+ (call-with-exception-handler 
+  (λ (exn)
+    (unless (empty? (mail-to))
+      (send-mail-message (gethostname)
+                         (format "guest-lvm-backup error - ~a ~a -> ~a" guest-name lvm-disk-path remote-host)
+                         (mail-to)
+                         empty
+                         empty
+                         (port->lines 
+                          (open-input-string 
+                           (with-output-to-string
+                            (λ ()
+                              (printf "An unexpected error occured~n")
+                              (printf "Error: ~a~n~n"  (exn-message exn))))))
+                         ""))
+    exn)
+  (λ ()
  
  (unless (logical-volume-exists? lvm-disk-path)
    (error 'no-volume "logical volume ~v does not exist." lvm-disk-path))
@@ -224,7 +253,26 @@
                  (error 'unknown-message "~v" else)])))
   (begin
     (log-guest-lvm-backup-info "~a: removing logical volume ~a" (now) snapshot-logical-path)
-    (remove-logical-volume snapshot-logical-path))))
+    (remove-logical-volume snapshot-logical-path)))
+    
+    (unless (empty? (mail-to))
+      (printf "~a: sending email to ~a~n" (now) (mail-to))
+      (send-mail-message (gethostname)
+                         (format "guest-lvm-backup succeeded:~a ~a -> ~a" guest-name lvm-disk-path remote-host)
+                         (mail-to)
+                         empty
+                         empty
+                         (port->lines 
+                          (open-input-string 
+                           (with-output-to-string
+                            (λ ()
+                              (printf "Remote Backup succeeded~n")
+                              (printf "Host: ~a~n" (gethostname))
+                              (printf "Guest: ~a~n" guest-name)
+                              (printf "Volume: ~a~n" lvm-disk-path)
+                              (printf "Size: ~a~n" volume-size)
+                              (printf "Snapshot time: ~a~n" snapshot-time)))))
+                         "")))))
 
 
 
