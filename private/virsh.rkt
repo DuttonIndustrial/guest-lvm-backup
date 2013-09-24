@@ -21,7 +21,7 @@
       (regexp-match? (pregexp (format "\\s~a\\s" (regexp-quote name))) (get-output-string output))))
 
 
-(define (shutdown-guest name #:timeout (timeout 30) #:poll (poll 1))
+(define (shutdown-guest name #:timeout (timeout 300) #:poll (poll 1))
   (unless (guest-running? name)
     (error 'shutdown-guest "guest ~a not running" name))
   
