@@ -1,6 +1,4 @@
-#lang setup/infotab
-
-
+#lang info
 
 (define name "guest-lvm-backup")
 (define compile-omit-paths '("test"))

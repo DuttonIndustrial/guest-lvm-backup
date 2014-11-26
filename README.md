@@ -20,7 +20,7 @@ and you need to make frequent backups offsite.
 
 How guest-lvm-backup solves it:
     guest-lvm-backup can upload an entire disk image nightly over a slow link. 
-It does this by comparing the previous backup image, to the local image and upload the differences. Thus making full nightly backups of a 100GB image over 1MB/s link easy to do.
+It does this by comparing the previous remote backup image, to the local image and uploading the differences. Thus making full nightly backups of a 100GB image over 1MB/s link easy to do.
 
 
 What it does:
@@ -38,7 +38,7 @@ rdiff, which is built upon the same library that rsync uses.
 guest-lvm-tape
 ===============
 
-Similar to guest-lvm-backup, but copies the data to a tape instead of a remote backup location. 
+Similar to guest-lvm-backup, but blindly copies all of the data to a tape instead of a remote backup location. guest-lvm-tape does no rsync magic. 
 
 Currently it copies 2 files. The first file contains information about the backup. It is a small text file.
 The second file is and entire gzipped copy of the logical volume.

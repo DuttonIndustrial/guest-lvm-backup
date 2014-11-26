@@ -25,6 +25,7 @@
 (define progress? (make-parameter #f))
 (define no-shutdown-guest? (make-parameter #f))
 (define snapshot-size (make-parameter "5G"))
+(define rewind-before (make-parameter #f))
 
 (command-line
  #:program "guest-lvm-tape"
@@ -36,7 +37,10 @@
  
  ["--eject" "Eject the tape after completion"
             (eject #t)]
-
+ 
+ ["--rewind-before" "Rewind the tape before starting"
+                    (rewind-before #t)]
+            
  [("--no-shutdown-guest")
               ("Do not shutdown guest prior to snapshot creation"
               "You can also specify this if the guest is already shutdown")
@@ -114,8 +118,9 @@
      
      (finally
       (begin
-        (printf "~a: rewinding ~a~n" (now) device)
-        (mt-rewind device)
+        (when (rewind-before)
+          (printf "~a: rewinding ~a~n" (now) device)
+          (mt-rewind device))
         
         ;write snapshot name and time to first tape file
         (printf "~a: writing snapshot information to ~a~n" (now) device)
@@ -130,7 +135,7 @@
             
             (printf "volume: ~a~n" lvm-disk-path)
             
-            (printf "time: ~a~n" snapshot-time)))
+            (printf "snapshot time: ~a~n" snapshot-time)))
         
         ;write snapshot gzip file to second tape device
         (printf "~a: writing snapshot volume to ~a~n" (now) device)
@@ -151,11 +156,7 @@
         
         
         (log-guest-lvm-tape-info "~a: weof device ~a" (now) device)
-        (mt-weof device)
-        
-        
-        (printf "~a: rewinding device ~a~n" (now) device)
-        (mt-rewind device))
+        (mt-weof device))
       
       (begin
         (printf "~a: removing logical volume ~a~n" (now) snapshot-logical-path)
@@ -163,6 +164,8 @@
      
      
         (when (eject)
+          (printf "~a: rewinding device ~a~n" (now) device)
+          (mt-rewind device)
           (printf "~a: ejecting device ~a~n" (now) device)
           (mt-offline device))
         
