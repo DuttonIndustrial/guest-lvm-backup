@@ -137,7 +137,15 @@
             
             (printf "snapshot time: ~a~n" snapshot-time)))
         
-        ;write snapshot gzip file to second tape device
+        ;write virsh dumpxml to second tape file
+        (printf "~a: writing virsh host xml to ~a~n" (now) device)
+        (with-output-to-file device
+          #:mode 'binary
+          #:exists 'update
+          (λ ()
+            (write (dump-xml guest-name))))
+        
+        ;write snapshot gzip file to third tape device
         (printf "~a: writing snapshot volume to ~a~n" (now) device)
         (pipeline
          (λ ()

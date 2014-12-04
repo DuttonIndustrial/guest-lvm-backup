@@ -5,11 +5,19 @@
          racket/port)
 
 
-(provide guest-running?
+(provide dump-xml
+         guest-running?
          shutdown-guest
          start-guest)
 
 
+(define (dump-xml name)
+  (let ([output (open-output-string)])
+    (if (parameterize ([current-output-port output]
+                           [current-error-port output])
+              (system (format "virsh dumpxml ~a" name)))
+      (error 'virsh "failed to dump xml for guest ~a. output: ~a" name (get-output-string output))
+      (get-output-string output))))
 
 
 (define (guest-running? name)
